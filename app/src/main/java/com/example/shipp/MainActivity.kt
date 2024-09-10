@@ -21,10 +21,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.IconButton
@@ -58,6 +60,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -97,7 +100,10 @@ fun Navigation(){
         composable("register") {
             RegisterScreen(navController = navController)
         }
-        composable("home/{username}") { backStackEntry ->
+        composable("PasswordRecovery"){
+            PasswordRecoveryScreen(navController = navController)
+        }
+        composable("home/{nombre}") { backStackEntry ->
             val nombre = backStackEntry.arguments?.getString("nombre")
             nombre?.let{
                 HomeScreen(navController = navController, nombre = it)
@@ -193,7 +199,7 @@ fun LoginScreen(navController: NavController){
             Text("No tienes una cuenta? Regístrate aquí")
         }
 
-        TextButton(onClick = { /*TODO*/ }) {
+        TextButton(onClick = { navController.navigate("passwordRecovery") }) {
             Text("Olvidaste tu contraseña?")
         }
 
@@ -210,6 +216,8 @@ fun RegisterScreen(navController: NavController){
     var email by remember { mutableStateOf("")}
     var password by remember { mutableStateOf("")}
     var confirmPassword by remember { mutableStateOf("")}
+
+    var registerFailed by remember { mutableStateOf(false) } //indicador de error de registro
 
     Column(
         modifier = Modifier
@@ -283,16 +291,27 @@ fun RegisterScreen(navController: NavController){
 
         Button(
             onClick = {
-                if (password == confirmPassword) {
-                    //si el parametro es correcto registra el usuario con todos los campos
-                    val newUser = User(user, nombre, apellido, email, password)
-                    UserManager.addUser(context, newUser)
-                    navController.navigate("login")
+                val users = UserManager.getUsers(context)
+                if (users.none { it.email == email }){ //verificamos que el email no exista antes
+                    if (password == confirmPassword) {
+                        //si el parametro es correcto registra el usuario con todos los campos
+                        val newUser = User(user, nombre, apellido, email, password)
+                        UserManager.addUser(context, newUser)
+                        navController.navigate("login")
+                    }
+                } else {
+                    registerFailed = true
                 }
+               
             },
             modifier = Modifier.fillMaxWidth()
         ){
             Text("Registrar")
+        }
+
+        if (registerFailed) {
+            Text(text = "El correo indicado ya está en uso para una cuenta",
+                color = MaterialTheme.colorScheme.error)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -354,7 +373,7 @@ fun HomeScreen(navController: NavController, nombre: String) {
                         .clickable {
                             SessionManager.logoutUser(context)
                             navController.navigate("login") {
-                                popUpTo("home") { inclusive  = true }
+                                popUpTo("home") { inclusive = true }
                             }
                         }
                         .padding(8.dp),
@@ -437,6 +456,67 @@ fun HomeScreen(navController: NavController, nombre: String) {
             }
         }
     )
+}
+
+@Composable
+fun PasswordRecoveryScreen(navController: NavController) {
+    var email by remember { mutableStateOf("")}
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.navigateUp() }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver"
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Recuperación de contraseña",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Text(
+            text = "Ingrese el correo electrónico con el que creó su cuenta, un email con las intstrucciones para el cabio de contraseña le llegarán a su correo.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(vertical = 16.dp),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = { /*TODO*/ },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text("ENVIAR")
+        }
+    }
 }
 
 //Composable reutilizable para los botones con iconos y texto

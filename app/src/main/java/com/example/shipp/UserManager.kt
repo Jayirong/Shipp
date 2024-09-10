@@ -34,8 +34,11 @@ object UserManager {
     //agregamos un usuario nuevo y lo guardamos en sharedpreferences
     fun addUser(context: Context, user: User) {
         val users = getUsers(context)
-        users.add(user)
-        saveUsers(context, users)
+        if (!users.any { it.email == user.email }){ //evitamos subir al mismo usuario 2 veces
+            users.add(user)
+            saveUsers(context, users)
+        }
+
     }
 
     //guardamos la lista de usuarios en sharedPreferences
