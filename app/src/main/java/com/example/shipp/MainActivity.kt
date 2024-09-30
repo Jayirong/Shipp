@@ -3,6 +3,7 @@
 package com.example.shipp
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.IconButton
@@ -67,6 +67,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -118,8 +120,9 @@ fun LoginScreen(navController: NavController){
     var password by remember { mutableStateOf("")}
     var passwordVisible by remember { mutableStateOf(false) }
     var loginFailed by remember { mutableStateOf(false) } //indicador de error de login
-    val coroutineScope = rememberCoroutineScope() //corrutina para la navegacion
+    var errmess by remember { mutableStateOf<String?>(null)}
 
+    val auth = FirebaseAuth.getInstance()
     val context = LocalContext.current
 
     Column(
@@ -172,14 +175,16 @@ fun LoginScreen(navController: NavController){
 
         Button(
             onClick = {
-                coroutineScope.launch {
-                    val isValid = UserManager.validateUser(context, email, password)
-                    if (isValid) {
-                        navController.navigate("home/$email")
-                    } else {
-                        loginFailed = true
+                auth.signInWithEmailAndPassword(email, password)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            navController.navigate("home/${auth.currentUser?.email}")
+                        } else {
+                            loginFailed = true
+                            errmess = task.exception?.message
+                            Toast.makeText(context, "Error de autenticacion: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                        }
                     }
-                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -188,7 +193,7 @@ fun LoginScreen(navController: NavController){
 
         if (loginFailed) {
             Text(
-                text = "Credenciales Incorrectas. Inténtelo de nuevo.",
+                text = errmess ?: "Credenciales Incorrectas. Inténtelo de nuevo.",
                 color = MaterialTheme.colorScheme.error
             )
         }
@@ -210,14 +215,11 @@ fun LoginScreen(navController: NavController){
 fun RegisterScreen(navController: NavController){
     val context = LocalContext.current
 
-    var user by remember { mutableStateOf("")}
     var nombre by remember { mutableStateOf("")}
     var apellido by remember { mutableStateOf("")}
     var email by remember { mutableStateOf("")}
     var password by remember { mutableStateOf("")}
     var confirmPassword by remember { mutableStateOf("")}
-
-    var registerFailed by remember { mutableStateOf(false) } //indicador de error de registro
 
     Column(
         modifier = Modifier
@@ -227,15 +229,6 @@ fun RegisterScreen(navController: NavController){
         horizontalAlignment = Alignment.CenterHorizontally
     ){
         Text(text = "Registro", style = MaterialTheme.typography.headlineMedium)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = user,
-            onValueChange = { user = it},
-            label = { Text("Usuario") },
-            modifier = Modifier.fillMaxWidth()
-        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -289,29 +282,40 @@ fun RegisterScreen(navController: NavController){
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        val auth = FirebaseAuth.getInstance()
+
         Button(
             onClick = {
-                val users = UserManager.getUsers(context)
-                if (users.none { it.email == email }){ //verificamos que el email no exista antes
-                    if (password == confirmPassword) {
-                        //si el parametro es correcto registra el usuario con todos los campos
-                        val newUser = User(user, nombre, apellido, email, password)
-                        UserManager.addUser(context, newUser)
-                        navController.navigate("login")
-                    }
-                } else {
-                    registerFailed = true
-                }
-               
-            },
+                if (nombre.isNotEmpty() && apellido.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty() && password == confirmPassword) {
+                    auth.createUserWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                //info adicional para firebase por si es necesario
+                                val userId = task.result?.user?.uid
+                                val database = FirebaseDatabase.getInstance()
+                                val ref = database.getReference("usuarios").child(userId!!)
+
+                                val usuario = User(nombre = nombre, apellido = apellido, email = email)
+
+                                ref.setValue(usuario).addOnCompleteListener { dbTask ->
+                                    if (dbTask.isSuccessful) {
+                                        Toast.makeText(context, "Buena data", Toast.LENGTH_LONG).show()
+                                        navController.navigate("login")
+                                    } else {
+                                        Toast.makeText(context, "Error al guardar datos: ${dbTask.exception?.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Error: ${task.exception?.message}",Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    } else {
+                            Toast.makeText(context, "Mala data", Toast.LENGTH_LONG).show()
+                        }
+                },
             modifier = Modifier.fillMaxWidth()
         ){
             Text("Registrar")
-        }
-
-        if (registerFailed) {
-            Text(text = "El correo indicado ya está en uso para una cuenta",
-                color = MaterialTheme.colorScheme.error)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -330,8 +334,6 @@ fun HomeScreen(navController: NavController, nombre: String) {
     //el drawer es para el boton sandwich de la esquina
     val drawerState = rememberDrawerState(DrawerValue.Closed) //controla si el drawer esta abierto o cerrado
     val coroutineScope = rememberCoroutineScope() //esto es para recordar el alcance de la corrutina, es para ejecutar funcionces tipo suspend
-
-    val context = LocalContext.current
 
     //ModalDrawer que despliega el emnu laternal
     ModalNavigationDrawer(
@@ -371,7 +373,7 @@ fun HomeScreen(navController: NavController, nombre: String) {
                 Row(
                     modifier = Modifier
                         .clickable {
-                            SessionManager.logoutUser(context)
+                            FirebaseAuth.getInstance().signOut()
                             navController.navigate("login") {
                                 popUpTo("home") { inclusive = true }
                             }
