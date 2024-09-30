@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "933053120301",
+    "project_id": "shipp-b209a",
+    "storage_bucket": "shipp-b209a.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933053120301:android:fa69f73c6862363a9ddda4",
+        "android_client_info": {
+          "package_name": "com.example.shipp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdmySSaHlh-_DtquMhX3FgpZtol8bg4Vg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

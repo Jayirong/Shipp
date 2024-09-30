@@ -8,11 +8,10 @@ import com.google.gson.reflect.TypeToken
 
 //Data class para representar un usuario
 data class User(
-    val user: String,
-    val nombre: String,
-    val apellido: String,
-    val email: String,
-    val password: String
+    val nombre: String = "",
+    val apellido: String = "",
+    val email: String = "",
+    val password: String = ""
 )
 
 object UserManager {
